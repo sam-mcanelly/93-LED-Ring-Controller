@@ -266,7 +266,8 @@ void spiral(bool half_cycle, bool spin) {
   }
 
   if(spin) {
-      if(spiral_lights(start_color_idx)) return;
+    shutoff_half_layer(0, 0, true);
+    if(spiral_lights(start_color_idx)) return;
   }
 
   if(half_cycle) return;
@@ -289,7 +290,7 @@ bool spiral_lights(int start_color_idx) {
     if(check_buttons()) return true;
     rightSpiral();
 
-    delay(delayTime * 5);
+    delay(delayTime * 3);
     pixels.show();
   }
 
@@ -428,10 +429,11 @@ void set_layer(int layer, bool off, bool one_at_a_time) {
 
 void shutoff_half_layer(int layer, int start_pt, bool continuous) {
   start_pt += layer_offsets[layer];
-  for(int j = 0; j < layer_counts[layer]; j++) {
+  for(int j = 0; j < layer_counts[layer] / 2; j++) {
     pixels.setPixelColor(start_pt++ , 0);
       
     if(continuous) {
+      delay(delayTime);
       pixels.show();
     }
 
