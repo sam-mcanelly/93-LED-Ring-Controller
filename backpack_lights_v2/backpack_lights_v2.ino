@@ -382,8 +382,7 @@ void twitch_layer(int layer, int degree, bool right) {
 
 }
 
-void leftRotateLayer(int layer, int d, int n)
-{
+void leftRotateLayer(int layer, int d, int n) {
   int i, j, k, temp;
   for (i = 0; i < gcd(d, n); i++)
   {
@@ -404,11 +403,10 @@ void leftRotateLayer(int layer, int d, int n)
   }
 }
 
-void 
+//void 
 
 /*Fuction to get gcd of a and b*/
-int gcd(int a,int b)
-{
+int gcd(int a,int b) {
    if(b==0)
      return a;
    else
