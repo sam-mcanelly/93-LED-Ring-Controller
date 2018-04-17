@@ -9,7 +9,7 @@
 #define GLITCH_MODE_STEPS 10
 #define GLITCH_FRAME_BUFFER_CNT 40
 #define SPIRALING_FRAME_BUFFER_CNT 4
-#define COLOR_MODE_COUNT 4
+#define COLOR_MODE_COUNT 6
 #define LAYER_COUNT 6
 #define LIGHT_RING_TOTAL 93
 
@@ -40,6 +40,8 @@ uint32_t orange = 0xFF6600;
 uint32_t rgb_colors[3] = {red, green, blue};
 uint32_t bw_colors[3] = {blue, white, blue};
 uint32_t red_colors[3] = {red, yellow, orange}; 
+uint32_t rwb_colors[3] = {red, white, blue};
+uint32_t grn_colors[3] = {green, yellow, white};
 uint32_t color_18[18];
 uint32_t *color_arrays[COLOR_MODE_COUNT];
 uint32_t *curr_color_array;
@@ -59,10 +61,29 @@ bool bool_op1 = false;
 bool bool_op2 = false;
 
 int layer_counts[LAYER_COUNT] = {32, 24, 16, 12, 8, 1};
-int layer_offsets[LAYER_COUNT] = {0, 32, 56, 72, 84, 92}; 
+int layer_offsets[LAYER_COUNT] = {0, 32, 56, 72, 84, 92};
 
-uint32_t *spiral_saved_states[SPIRALING_FRAME_BUFFER_CNT];
-uint32_t *glitch_saved_states[GLITCH_FRAME_BUFFER_CNT];
+//ring layer index bank
+int layer_0_indices[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
+                         13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
+                         23, 24, 25, 26, 27, 28, 29, 30, 31}; 
+int layer_1_indices[] = {32, 33, 34, 35, 36, 37, 38, 39, 40,
+                         41, 42, 43, 44, 45, 46, 47, 48, 49, 
+                         50, 51, 52, 53, 54, 55};
+int layer_2_indices[] = {56, 57, 58, 59, 60, 61, 62, 63, 64,
+                         65, 66, 67, 68, 69, 70, 71};
+int layer_3_indices[] = {72, 73, 74, 75, 76, 77, 78, 79, 80,
+                         81, 82, 83, 84};
+int layer_4_indices[] = {85, 86, 87, 88, 89, 90, 91};
+int layer_5_indices[] = {92};
+
+int *layer_indices[LAYER_COUNT] = {layer_0_indices, layer_1_indices, layer_2_indices, layer_3_indices,
+                                   layer_4_indices, layer_5_indices};
+
+int spiral_idx;
+uint32_t spiral_saved_state[LIGHT_RING_TOTAL];
+uint32_t smear_saved_states[SPIRALING_FRAME_BUFFER_CNT][LIGHT_RING_TOTAL];
+uint32_t glitch_saved_states[GLITCH_FRAME_BUFFER_CNT][LIGHT_RING_TOTAL];
 uint8_t glitch_layer_order[6] = {1, 3, 0, 5, 2, 4};
 
 void setup() {
@@ -71,12 +92,13 @@ void setup() {
   color_arrays[0] = rgb_colors;
   color_arrays[1] = bw_colors;
   color_arrays[2] = red_colors;
-  color_arrays[3] = color_18;
+  color_arrays[3] = rwb_colors;
+  color_arrays[4] = grn_colors;
+  color_arrays[5] = color_18;
 
+  //default to RGB mode
   curr_color_array = color_arrays[curr_c_array_idx];
   curr_c_array_size = rgb_arr_sz;
-
-  init_frame_history_arrays();
 
   pixels.begin();
   pixels.setBrightness(brightness);
@@ -146,55 +168,6 @@ void lit_mode() {
   delayTime += 20;
   
   next_color();
-}
-
-void spiral(bool half_cycle, bool spin) {  
-  int start_color_idx = color_idx;
-  
-  for(int i = 0; i < LIGHT_RING_TOTAL; i++) {
-    if(check_buttons()) return;
-    pixels.setPixelColor(i, curr_color_array[color_idx]);
-    pixels.show();
-    
-    next_color();
-    
-    delay(delayTime / 3);
-  }
-
-  if(spin) {
-    while(true) {
-      if(spiral_smear_lights(start_color_idx)) return;
-    }
-  }
-
-  if(half_cycle) return;
-
-  for(int i = 92; i >= 0; i--) {
-    if(check_buttons()) return;
-    pixels.setPixelColor(i, 0);
-    pixels.show();
-    delay(delayTime / 3);
-  }
-}
-
-bool spiral_smear_lights(int start_color_idx) {
-  spiral_current_frame = 0;
-  //save initial frame
-  //save_frame(spiral_saved_states, spiral_current_frame++);
-
-  //spiral lights 288 times
-  //288 is the LCM of all the layer sizes as well as 18 and 3 (color array sizes)
-  for(int j = 0; j < 288; j++) {
-    for(int i = 0; i < LAYER_COUNT; i++) {
-      if(check_buttons()) return true;
-      leftRotateLayer(i, 1);
-    }
-
-    //delay(delayTime / 4);
-    pixels.show();
-  }
-
-  return false;
 }
 
 void random_blink(uint32_t density) {
@@ -279,6 +252,50 @@ void portal(bool rainbow, bool continuous) {
   }
 }
 
+void spiral(bool half_cycle, bool spin) {  
+  int start_color_idx = color_idx;
+  
+  for(int i = 0; i < LIGHT_RING_TOTAL; i++) {
+    if(check_buttons()) return;
+    pixels.setPixelColor(i, curr_color_array[color_idx]);
+    pixels.show();
+    
+    next_color();
+    
+    delay(delayTime / 3);
+  }
+
+  if(spin) {
+      if(spiral_lights(start_color_idx)) return;
+  }
+
+  if(half_cycle) return;
+
+  for(int i = 92; i >= 0; i--) {
+    if(check_buttons()) return;
+    pixels.setPixelColor(i, 0);
+    pixels.show();
+    delay(delayTime / 3);
+  }
+}
+
+bool spiral_lights(int start_color_idx) {
+  for(int i = 0; i < LIGHT_RING_TOTAL; i++) {
+    spiral_saved_state[i] = pixels.getPixelColor(i);
+  }
+  //do one full rotation
+  spiral_idx = 0;
+  for(int j = 0; j < 93; j++) {
+    if(check_buttons()) return true;
+    rightSpiral();
+
+    delay(delayTime * 5);
+    pixels.show();
+  }
+
+  return false;
+}
+
 void spinning() {
   
   
@@ -357,6 +374,7 @@ void decay_layer(int layer) {
 
 //degree - how many places are we shifting?
 //right - twitch right or left
+/*
 void twitch_layer(int layer, int degree, bool right) {
   if(right) {
 
@@ -366,38 +384,31 @@ void twitch_layer(int layer, int degree, bool right) {
   }
 
 }
+*/
 
-void leftRotateLayer(int layer, int n) {
-  int i, j, k;
-  uint32_t temp;
-  for (i = 0; i < gcd(layer_counts[layer], n); i++)
-  {
-    /* move i-th values of blocks */
-    temp = pixels.getPixelColor(layer_offsets[layer] + i);
-    j = layer_offsets[layer] + i;
-    while(1)
-    {
-      k = j + n;
-      if (k >= layer_counts[layer] + layer_offsets[layer])
-        k = (k - layer_counts[layer]) + layer_offsets[layer];
-      if (k == i)
-        break;
-      pixels.setPixelColor(j, pixels.getPixelColor(layer_offsets[i] + k));
-      j = k;
-    }
-    pixels.setPixelColor(j, temp);
+void leftSpiral() {
+  int i;
+
+  for(i = 0; i < LIGHT_RING_TOTAL; i++) {
+    pixels.setPixelColor(i, spiral_saved_state[(i + spiral_idx) % LIGHT_RING_TOTAL]);
   }
+
+  spiral_idx++;
+  spiral_idx %= LIGHT_RING_TOTAL;
+  
 }
 
 
-/*Fuction to get gcd of a and b*/
-int gcd(int a,int b) {
-   if(b==0)
-     return a;
-   else
-     return gcd(b, a%b);
-}
+void rightSpiral() {
+  int i;
 
+  for(i = LIGHT_RING_TOTAL - 1; i >= 0; i--) {
+    pixels.setPixelColor(i, spiral_saved_state[(i + (92 - spiral_idx)) % LIGHT_RING_TOTAL]);
+  }
+
+  spiral_idx++;
+  spiral_idx %= LIGHT_RING_TOTAL;
+}
 
 void set_layer(int layer, bool off, bool one_at_a_time) {
   uint32_t color;
@@ -518,7 +529,7 @@ bool check_color_array_logic() {
     delay(100);
     flash_circle(red);
     curr_c_array_idx += 1;
-    curr_c_array_idx %= 4;
+    curr_c_array_idx %= COLOR_MODE_COUNT;
     curr_color_array = color_arrays[curr_c_array_idx];
     if(curr_color_array != color_18) curr_c_array_size = rgb_arr_sz;
     else curr_c_array_size = color_18_sz;
@@ -556,21 +567,9 @@ void increment_delay_time() {
   delayTime = (delayTime % 50) + 2;
 }
 
-void init_frame_history_arrays() {
-  int i;
-
-  for(i = 0; i < GLITCH_MODE_STEPS; i++) {
-    glitch_saved_states[i] = new uint32_t[LIGHT_RING_TOTAL];
-  }
-
-  for(i = 0; i < SPIRALING_FRAME_BUFFER_CNT; i++) {
-    spiral_saved_states[i] = new uint32_t[LIGHT_RING_TOTAL];
-  }
-}
-
-void save_frame(uint32_t **states, int idx) {
+void save_frame(uint32_t states[][LIGHT_RING_TOTAL], int idx) {
   for(int i = 0; i < LIGHT_RING_TOTAL; i++) {
-    states[idx][i] = pixels.getPixelColor(idx);
+    states[idx][i] = pixels.getPixelColor(i);
   }
 }
 
