@@ -179,34 +179,19 @@ void spiral(bool half_cycle, bool spin) {
 
 bool spiral_smear_lights(int start_color_idx) {
   spiral_current_frame = 0;
-  //save inital frame
-  save_frame(spiral_saved_states, spiral_current_frame++);
-  color_idx = start_color_idx + 1;
-  color_idx %= curr_c_array_size;
+  //save initial frame
+  //save_frame(spiral_saved_states, spiral_current_frame++);
 
   //spiral lights 288 times
   //288 is the LCM of all the layer sizes as well as 18 and 3 (color array sizes)
-  for(int i = 0; i < 288; i++) {
-    start_color_idx = color_idx;
-    for(int i = 0; i < LIGHT_RING_TOTAL; i++) {
+  for(int j = 0; j < 288; j++) {
+    for(int i = 0; i < LAYER_COUNT; i++) {
       if(check_buttons()) return true;
-      pixels.setPixelColor(i, curr_color_array[color_idx]);
-      if(i < 6) save_frame(spiral_saved_states, spiral_current_frame++);
-
-      if(i < 2) {
-        next_color();
-      }
-      else if(i >=2 && i < 6 && i % 2 == 0) {
-         next_color();
-      }
-      if(i > i % 3 == 0) {
-        next_color();
-      }
+      leftRotateLayer(i, 1);
     }
-    delay(delayTime * 4);
+
+    //delay(delayTime / 4);
     pixels.show();
-    color_idx = start_color_idx + 1;
-    color_idx %= curr_c_array_size;
   }
 
   return false;
@@ -377,23 +362,24 @@ void twitch_layer(int layer, int degree, bool right) {
 
   }
   else {
-    leftRotateLayer(layer, degree, layer_counts[layer]);
+    leftRotateLayer(layer, degree);
   }
 
 }
 
-void leftRotateLayer(int layer, int d, int n) {
-  int i, j, k, temp;
-  for (i = 0; i < gcd(d, n); i++)
+void leftRotateLayer(int layer, int n) {
+  int i, j, k;
+  uint32_t temp;
+  for (i = 0; i < gcd(layer_counts[layer], n); i++)
   {
     /* move i-th values of blocks */
     temp = pixels.getPixelColor(layer_offsets[layer] + i);
     j = layer_offsets[layer] + i;
     while(1)
     {
-      k = j + d;
-      if (k >= n + layer_offsets[layer])
-        k = (k - n) + layer_offsets[layer];
+      k = j + n;
+      if (k >= layer_counts[layer] + layer_offsets[layer])
+        k = (k - layer_counts[layer]) + layer_offsets[layer];
       if (k == i)
         break;
       pixels.setPixelColor(j, pixels.getPixelColor(layer_offsets[i] + k));
@@ -403,7 +389,6 @@ void leftRotateLayer(int layer, int d, int n) {
   }
 }
 
-//void 
 
 /*Fuction to get gcd of a and b*/
 int gcd(int a,int b) {
