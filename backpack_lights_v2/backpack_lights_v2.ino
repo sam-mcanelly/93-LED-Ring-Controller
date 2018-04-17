@@ -7,8 +7,7 @@
 
 #define LIT_MODE 4
 #define GLITCH_MODE_STEPS 10
-#define GLITCH_FRAME_BUFFER_CNT 40
-#define SPIRALING_FRAME_BUFFER_CNT 4
+#define HISTORY_BUFFER_CNT 3
 #define COLOR_MODE_COUNT 6
 #define LAYER_COUNT 6
 #define LIGHT_RING_TOTAL 93
@@ -22,35 +21,33 @@ Adafruit_NeoPixel remote_pixels = Adafruit_NeoPixel(3, RMT_LGHT_PIN);
 
 bool glitch_mode_on = false;
 bool rotate_mode_on = false;
-int spiral_current_frame = 0;
-int glitch_current_frame = 0;
-uint16_t glitch_step = 0;   // how far into the glitch animation are we?
+uint8_t glitch_step = 0;   // how far into the glitch animation are we?
 uint8_t mode = 0;           // selects the pattern mode
 
-uint32_t color = 0xFF0000;  // default color is red
-
 //colors
-uint32_t red = 0xFF0000;
-uint32_t green = red >> 8;
-uint32_t blue = green >> 8;
-uint32_t white = 0xFFFFFF;
-uint32_t yellow = 0xFFFF00;
-uint32_t orange = 0xFF6600;
+const PROGMEM uint32_t red = 0xFF0000;
+const PROGMEM uint32_t green = red >> 8;
+const PROGMEM uint32_t blue = green >> 8;
+const PROGMEM uint32_t white = 0xFFFFFF;
+const PROGMEM uint32_t yellow = 0xFFFF00;
+const PROGMEM uint32_t orange = 0xFF6600;
 
-uint32_t rgb_colors[3] = {red, green, blue};
-uint32_t bw_colors[3] = {blue, white, blue};
-uint32_t red_colors[3] = {red, yellow, orange}; 
-uint32_t rwb_colors[3] = {red, white, blue};
-uint32_t grn_colors[3] = {green, yellow, white};
+const PROGMEM uint32_t rgb_colors[3] = {red, green, blue};
+const PROGMEM uint32_t bw_colors[3] = {blue, white, blue};
+const PROGMEM uint32_t red_colors[3] = {red, yellow, orange}; 
+const PROGMEM uint32_t rwb_colors[3] = {red, white, blue};
+const PROGMEM uint32_t grn_colors[3] = {green, yellow, white};
 uint32_t color_18[18];
 uint32_t *color_arrays[COLOR_MODE_COUNT];
 uint32_t *curr_color_array;
 
-const int rgb_arr_sz = 3;
-const int color_18_sz = 18;
-int curr_c_array_size;
-int color_idx = 0;
-int curr_c_array_idx = 0;
+const PROGMEM int rgb_arr_sz = 3;
+const PROGMEM int color_18_sz = 18;
+
+uint16_t curr_c_array_size;
+uint8_t curr_c_array_idx = 0;
+uint8_t color_idx = 0;
+
 
 uint32_t brightness = 20;
 uint32_t delayTime = 10;
@@ -60,30 +57,31 @@ uint8_t spiral_direction = 0;
 bool bool_op1 = false;
 bool bool_op2 = false;
 
-int layer_counts[LAYER_COUNT] = {32, 24, 16, 12, 8, 1};
-int layer_offsets[LAYER_COUNT] = {0, 32, 56, 72, 84, 92};
+const PROGMEM int layer_counts[LAYER_COUNT] = {32, 24, 16, 12, 8, 1};
+const PROGMEM int layer_offsets[LAYER_COUNT] = {0, 32, 56, 72, 84, 92};
 
 //ring layer index bank
-int layer_0_indices[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
+const PROGMEM int layer_0_indices[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
                          13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
                          23, 24, 25, 26, 27, 28, 29, 30, 31}; 
-int layer_1_indices[] = {32, 33, 34, 35, 36, 37, 38, 39, 40,
+const PROGMEM int layer_1_indices[] = {32, 33, 34, 35, 36, 37, 38, 39, 40,
                          41, 42, 43, 44, 45, 46, 47, 48, 49, 
                          50, 51, 52, 53, 54, 55};
-int layer_2_indices[] = {56, 57, 58, 59, 60, 61, 62, 63, 64,
+const PROGMEM int layer_2_indices[] = {56, 57, 58, 59, 60, 61, 62, 63, 64,
                          65, 66, 67, 68, 69, 70, 71};
-int layer_3_indices[] = {72, 73, 74, 75, 76, 77, 78, 79, 80,
+const PROGMEM int layer_3_indices[] = {72, 73, 74, 75, 76, 77, 78, 79, 80,
                          81, 82, 83, 84};
-int layer_4_indices[] = {85, 86, 87, 88, 89, 90, 91};
-int layer_5_indices[] = {92};
+const PROGMEM int layer_4_indices[] = {85, 86, 87, 88, 89, 90, 91};
+const PROGMEM int layer_5_indices[] = {92};
 
-int *layer_indices[LAYER_COUNT] = {layer_0_indices, layer_1_indices, layer_2_indices, layer_3_indices,
+const PROGMEM int layer_indices[][LAYER_COUNT] = {layer_0_indices, layer_1_indices, layer_2_indices, layer_3_indices,
                                    layer_4_indices, layer_5_indices};
 
-int spiral_idx;
-uint32_t spiral_saved_state[LIGHT_RING_TOTAL];
-uint32_t smear_saved_states[SPIRALING_FRAME_BUFFER_CNT][LIGHT_RING_TOTAL];
-uint32_t glitch_saved_states[GLITCH_FRAME_BUFFER_CNT][LIGHT_RING_TOTAL];
+int history_idx = 0;
+int transform_idx = 0;
+uint32_t transform_saved_state[LIGHT_RING_TOTAL];
+uint32_t history[HISTORY_BUFFER_CNT][LIGHT_RING_TOTAL];
+
 uint8_t glitch_layer_order[6] = {1, 3, 0, 5, 2, 4};
 
 void setup() {
@@ -110,8 +108,6 @@ void setup() {
   pinMode(BTN1_PIN, INPUT_PULLUP);
   pinMode(BTN2_PIN, INPUT_PULLUP);
   pinMode(BTN3_PIN, INPUT_PULLUP);
-
-  Serial.begin(9600);
 }
 
 void loop() {  
@@ -132,6 +128,10 @@ void loop() {
 void lit_mode() {
   if(mode != LIT_MODE) return;
   spiral(bool_op1, bool_op2);
+  if(history_idx < 3) {
+    save_frame(history, history_idx);
+    history_idx++;
+  }
 
   if(mode != LIT_MODE) return;
   pulse(bool_op1);
@@ -199,7 +199,7 @@ void pulse(bool rainbow) {
   for(int i = 0; i < LAYER_COUNT; i++) {
     if(check_buttons()) return;
     
-    set_layer(i, false, false);
+    set_layer_solid(i, false, false);
 
     if(rainbow) {
       next_color();
@@ -212,7 +212,7 @@ void pulse(bool rainbow) {
   for(int i = 0; i < LAYER_COUNT - 1; i++) {
     if(check_buttons()) return;
 
-    set_layer((LAYER_COUNT - 1) - i, true, false);
+    set_layer_solid((LAYER_COUNT - 1) - i, true, false);
     pixels.show();
     delay(delayTime * 3);
   }
@@ -225,10 +225,10 @@ void portal(bool rainbow, bool continuous) {
   for(int i = 0; i < LAYER_COUNT; i++) {
     if(check_buttons()) return;
 
-    set_layer(i, false, false);
+    set_layer_solid(i, false, false);
     
     if(!continuous && i > 0) {
-      set_layer(i - 1, true, false);
+      set_layer_solid(i - 1, true, false);
     }
     if(rainbow) {
       next_color();
@@ -244,7 +244,7 @@ void portal(bool rainbow, bool continuous) {
     
       if(check_buttons()) return;
   
-      set_layer(i, true, false);
+      set_layer_solid(i, true, false);
 
       pixels.show();
       delay(delayTime * 3);
@@ -282,10 +282,10 @@ void spiral(bool half_cycle, bool spin) {
 
 bool spiral_lights(int start_color_idx) {
   for(int i = 0; i < LIGHT_RING_TOTAL; i++) {
-    spiral_saved_state[i] = pixels.getPixelColor(i);
+    transform_saved_state[i] = pixels.getPixelColor(i);
   }
   //do one full rotation
-  spiral_idx = 0;
+  transform_idx = 0;
   for(int j = 0; j < 93; j++) {
     if(check_buttons()) return true;
     rightSpiral();
@@ -305,24 +305,24 @@ void spinning() {
 void execute_glitch() {
   glitch_mode_on = true;
   glitch_step = 0;
-  glitch_current_frame = 0;
+  history_idx = 0;
 }
 
 void execute_glitch_step() {
   switch(glitch_step) {
     case 0: 
       delayTime += 30;
-      save_frame(glitch_saved_states, glitch_current_frame++);
+      save_frame(history, history_idx++);
       glitch_step++;
       break;
     case 1: 
       delayTime += 30;
-      save_frame(glitch_saved_states, glitch_current_frame++);
+      save_frame(history, history_idx++);
       glitch_step++;
       break;
     case 2: 
       delayTime += 30;
-      save_frame(glitch_saved_states, glitch_current_frame++);
+      save_frame(history, history_idx++);
       glitch_step++;
       break;
     case 3:
@@ -391,11 +391,11 @@ void leftSpiral() {
   int i;
 
   for(i = 0; i < LIGHT_RING_TOTAL; i++) {
-    pixels.setPixelColor(i, spiral_saved_state[(i + spiral_idx) % LIGHT_RING_TOTAL]);
+    pixels.setPixelColor(i, transform_saved_state[(i + transform_idx) % LIGHT_RING_TOTAL]);
   }
 
-  spiral_idx++;
-  spiral_idx %= LIGHT_RING_TOTAL;
+  transform_idx++;
+  transform_idx %= LIGHT_RING_TOTAL;
   
 }
 
@@ -404,14 +404,14 @@ void rightSpiral() {
   int i;
 
   for(i = LIGHT_RING_TOTAL - 1; i >= 0; i--) {
-    pixels.setPixelColor(i, spiral_saved_state[(i + (92 - spiral_idx)) % LIGHT_RING_TOTAL]);
+    pixels.setPixelColor(i, transform_saved_state[(i + (92 - transform_idx)) % LIGHT_RING_TOTAL]);
   }
 
-  spiral_idx++;
-  spiral_idx %= LIGHT_RING_TOTAL;
+  transform_idx++;
+  transform_idx %= LIGHT_RING_TOTAL;
 }
 
-void set_layer(int layer, bool off, bool one_at_a_time) {
+void set_layer_solid(int layer, bool off, bool one_at_a_time) {
   uint32_t color;
 
   if(off) color = 0;
@@ -422,7 +422,7 @@ void set_layer(int layer, bool off, bool one_at_a_time) {
 
     if(one_at_a_time) { 
       pixels.show();
-      delay(delayTime / 3);
+      delay(delayTime / 4);
     }
   }
 }
@@ -503,7 +503,6 @@ void check_speed_button() {
 void check_function_button() {
   if(digitalRead(BTN3_PIN) == LOW) {
     delay(50);
-    Serial.println("executing_glitch!");
     //execute_glitch();
   }
 }
