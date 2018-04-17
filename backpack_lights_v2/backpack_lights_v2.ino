@@ -25,18 +25,18 @@ uint8_t glitch_step = 0;   // how far into the glitch animation are we?
 uint8_t mode = 0;           // selects the pattern mode
 
 //colors
-const PROGMEM uint32_t red = 0xFF0000;
-const PROGMEM uint32_t green = red >> 8;
-const PROGMEM uint32_t blue = green >> 8;
-const PROGMEM uint32_t white = 0xFFFFFF;
-const PROGMEM uint32_t yellow = 0xFFFF00;
-const PROGMEM uint32_t orange = 0xFF6600;
+uint32_t red = 0xFF0000;
+uint32_t green = red >> 8;
+uint32_t blue = green >> 8;
+uint32_t white = 0xFFFFFF;
+uint32_t yellow = 0xFFFF00;
+uint32_t orange = 0xFF6600;
 
-const PROGMEM uint32_t rgb_colors[3] = {red, green, blue};
-const PROGMEM uint32_t bw_colors[3] = {blue, white, blue};
-const PROGMEM uint32_t red_colors[3] = {red, yellow, orange}; 
-const PROGMEM uint32_t rwb_colors[3] = {red, white, blue};
-const PROGMEM uint32_t grn_colors[3] = {green, yellow, white};
+uint32_t rgb_colors[3] = {red, green, blue};
+uint32_t bw_colors[3] = {blue, white, blue};
+uint32_t red_colors[3] = {red, yellow, orange}; 
+uint32_t rwb_colors[3] = {red, white, blue};
+uint32_t grn_colors[3] = {green, yellow, white};
 uint32_t color_18[18];
 uint32_t *color_arrays[COLOR_MODE_COUNT];
 uint32_t *curr_color_array;
@@ -44,9 +44,9 @@ uint32_t *curr_color_array;
 const PROGMEM int rgb_arr_sz = 3;
 const PROGMEM int color_18_sz = 18;
 
-uint16_t curr_c_array_size;
-uint8_t curr_c_array_idx = 0;
-uint8_t color_idx = 0;
+int curr_c_array_size;
+int curr_c_array_idx = 0;
+int color_idx = 0;
 
 
 uint32_t brightness = 20;
@@ -57,24 +57,26 @@ uint8_t spiral_direction = 0;
 bool bool_op1 = false;
 bool bool_op2 = false;
 
-const PROGMEM int layer_counts[LAYER_COUNT] = {32, 24, 16, 12, 8, 1};
-const PROGMEM int layer_offsets[LAYER_COUNT] = {0, 32, 56, 72, 84, 92};
+const PROGMEM int glitch_layer_counts[LAYER_COUNT] = {32, 24, 16, 12, 8, 1};
+const PROGMEM int glitch_layer_offsets[LAYER_COUNT] = {0, 32, 56, 72, 84, 92};
+int normal_layer_counts[LAYER_COUNT] = {32, 24, 16, 12, 8, 1};
+int normal_layer_offsets[LAYER_COUNT] = {0, 32, 56, 72, 84, 92};
 
 //ring layer index bank
-const PROGMEM int layer_0_indices[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
+int layer_0_indices[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
                          13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
                          23, 24, 25, 26, 27, 28, 29, 30, 31}; 
-const PROGMEM int layer_1_indices[] = {32, 33, 34, 35, 36, 37, 38, 39, 40,
+int layer_1_indices[] = {32, 33, 34, 35, 36, 37, 38, 39, 40,
                          41, 42, 43, 44, 45, 46, 47, 48, 49, 
                          50, 51, 52, 53, 54, 55};
-const PROGMEM int layer_2_indices[] = {56, 57, 58, 59, 60, 61, 62, 63, 64,
+int layer_2_indices[] = {56, 57, 58, 59, 60, 61, 62, 63, 64,
                          65, 66, 67, 68, 69, 70, 71};
-const PROGMEM int layer_3_indices[] = {72, 73, 74, 75, 76, 77, 78, 79, 80,
+int layer_3_indices[] = {72, 73, 74, 75, 76, 77, 78, 79, 80,
                          81, 82, 83, 84};
-const PROGMEM int layer_4_indices[] = {85, 86, 87, 88, 89, 90, 91};
-const PROGMEM int layer_5_indices[] = {92};
+int layer_4_indices[] = {85, 86, 87, 88, 89, 90, 91};
+int layer_5_indices[] = {92};
 
-const PROGMEM int layer_indices[][LAYER_COUNT] = {layer_0_indices, layer_1_indices, layer_2_indices, layer_3_indices,
+int layer_indices[][LAYER_COUNT] = {layer_0_indices, layer_1_indices, layer_2_indices, layer_3_indices,
                                    layer_4_indices, layer_5_indices};
 
 int history_idx = 0;
@@ -100,6 +102,8 @@ void setup() {
 
   pixels.begin();
   pixels.setBrightness(brightness);
+  for(int i = 0; i < 93; i++) pixels.setPixelColor(i, red);
+  pixels.show();
 
   remote_pixels.begin();
   remote_pixels.setBrightness(brightness);
@@ -128,10 +132,6 @@ void loop() {
 void lit_mode() {
   if(mode != LIT_MODE) return;
   spiral(bool_op1, bool_op2);
-  if(history_idx < 3) {
-    save_frame(history, history_idx);
-    history_idx++;
-  }
 
   if(mode != LIT_MODE) return;
   pulse(bool_op1);
@@ -211,8 +211,8 @@ void pulse(bool rainbow) {
   //zoom out and turn off
   for(int i = 0; i < LAYER_COUNT - 1; i++) {
     if(check_buttons()) return;
-
     set_layer_solid((LAYER_COUNT - 1) - i, true, false);
+    
     pixels.show();
     delay(delayTime * 3);
   }
@@ -224,18 +224,22 @@ void portal(bool rainbow, bool continuous) {
   //zoom in and turn on
   for(int i = 0; i < LAYER_COUNT; i++) {
     if(check_buttons()) return;
-
-    set_layer_solid(i, false, false);
+    if(!glitch_mode_on) set_layer_solid(i, false, false);
+    else glitch_layer_solid(i, false, false);
+    //set_layer_solid(i, false, false);
     
     if(!continuous && i > 0) {
-      set_layer_solid(i - 1, true, false);
+      if(!glitch_mode_on) set_layer_solid(i - 1, true, false);
+      else glitch_layer_solid(i - 1, true, false);
+      //set_layer_solid(i - 1, true, false);
     }
     if(rainbow) {
       next_color();
     }
 
     pixels.show();
-    delay(delayTime * 3);
+    if(glitch_mode_on) delay(delayTime * 1.5);
+    else delay(delayTime * 3);
   }
 
   if(continuous) {
@@ -244,7 +248,8 @@ void portal(bool rainbow, bool continuous) {
     
       if(check_buttons()) return;
   
-      set_layer_solid(i, true, false);
+      if(!glitch_mode_on) set_layer_solid(i, true, false);
+      else glitch_layer_solid(i, true, false);
 
       pixels.show();
       delay(delayTime * 3);
@@ -289,8 +294,9 @@ bool spiral_lights(int start_color_idx) {
   for(int j = 0; j < 93; j++) {
     if(check_buttons()) return true;
     rightSpiral();
-
-    delay(delayTime * 3);
+    
+    if(curr_color_array != color_18) delay(delayTime * 5);
+    else delay(delayTime * 3);
     pixels.show();
   }
 
@@ -312,17 +318,17 @@ void execute_glitch_step() {
   switch(glitch_step) {
     case 0: 
       delayTime += 30;
-      save_frame(history, history_idx++);
+      //save_frame(history, history_idx++);
       glitch_step++;
       break;
     case 1: 
       delayTime += 30;
-      save_frame(history, history_idx++);
+      //save_frame(history, history_idx++);
       glitch_step++;
       break;
     case 2: 
       delayTime += 30;
-      save_frame(history, history_idx++);
+      //save_frame(history, history_idx++);
       glitch_step++;
       break;
     case 3:
@@ -360,11 +366,11 @@ void execute_glitch_decay() {
   int start_point;
   for(int i = 0; i < LAYER_COUNT; i++) {
     // pick a random starting point on the given ring
-    start_point = random(layer_counts[i]);
+    start_point = random(normal_layer_counts[i]);
 
     //shut off half that ring
-    shutoff_half_layer(glitch_layer_order[i], start_point, flash_circle);
-    delay(2);
+    //shutoff_half_layer(glitch_layer_order[i], start_point, flash_circle);
+    //delay(2);
 
   }
 }
@@ -417,9 +423,23 @@ void set_layer_solid(int layer, bool off, bool one_at_a_time) {
   if(off) color = 0;
   else color =  curr_color_array[color_idx];
 
-  for(int i = 0; i < layer_counts[layer]; i++) {
-    pixels.setPixelColor(layer_offsets[layer] + i, color); 
+  for(int i = 0; i < normal_layer_counts[layer]; i++) {
+    pixels.setPixelColor(normal_layer_offsets[layer] + i, color); 
+    if(one_at_a_time) { 
+      pixels.show();
+      delay(delayTime / 4);
+    }
+  }
+}
 
+void glitch_layer_solid(int layer, bool off, bool one_at_a_time) {
+  uint32_t color;
+
+  if(off) color = 0;
+  else color =  curr_color_array[color_idx];
+
+  for(int i = 0; i < glitch_layer_counts[layer]; i++) {
+    pixels.setPixelColor(glitch_layer_offsets[layer] + i, color);  
     if(one_at_a_time) { 
       pixels.show();
       delay(delayTime / 4);
@@ -428,8 +448,8 @@ void set_layer_solid(int layer, bool off, bool one_at_a_time) {
 }
 
 void shutoff_half_layer(int layer, int start_pt, bool continuous) {
-  start_pt += layer_offsets[layer];
-  for(int j = 0; j < layer_counts[layer] / 2; j++) {
+  start_pt += normal_layer_offsets[layer];
+  for(int j = 0; j < normal_layer_counts[layer] / 2; j++) {
     pixels.setPixelColor(start_pt++ , 0);
       
     if(continuous) {
@@ -438,13 +458,13 @@ void shutoff_half_layer(int layer, int start_pt, bool continuous) {
     }
 
       //reset the next point to the start of the layer
-    if(start_pt > layer_offsets[layer] + (layer_counts[layer] - 1)) start_pt = layer_offsets[layer];
+    if(start_pt > normal_layer_offsets[layer] + (normal_layer_counts[layer] - 1)) start_pt = normal_layer_offsets[layer];
   }
   pixels.show();
 }
 
 void seton_half_layer(int layer, int start_pt) {
-  for(int j = 0; j < layer_counts[layer]; j++) {
+  for(int j = 0; j < normal_layer_counts[layer]; j++) {
 
   }
 }
@@ -504,6 +524,7 @@ void check_function_button() {
   if(digitalRead(BTN3_PIN) == LOW) {
     delay(50);
     //execute_glitch();
+    glitch_mode_on = !glitch_mode_on;
   }
 }
 
