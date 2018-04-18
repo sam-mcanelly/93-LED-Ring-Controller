@@ -130,8 +130,11 @@ void loop() {
 }
 
 void lit_mode() {
-  if(mode != LIT_MODE) return;
-  spiral(bool_op1, bool_op2);
+  bool saved_glitch_mode = glitch_mode_on;
+  glitch_mode_on = false;
+
+  //if(mode != LIT_MODE) return;
+  //spiral(bool_op1, bool_op2);
 
   if(mode != LIT_MODE) return;
   pulse(bool_op1);
@@ -158,16 +161,19 @@ void lit_mode() {
   
   if(mode != LIT_MODE) return;
   for(int i = 0; i < 3; i++) {
+    if(i == 2) glitch_mode_on = true;
     portal(bool_op1, bool_op2);
     delayTime += 20;
   } 
   for(int i = 0; i < 4; i++) {
+    if(i > 0) glitch_mode_on = false;
     portal(bool_op1, bool_op2);
     delayTime -= 20;
   } 
   delayTime += 20;
   
   next_color();
+  glitch_mode_on = saved_glitch_mode;
 }
 
 void random_blink(uint32_t density) {
@@ -225,7 +231,12 @@ void portal(bool rainbow, bool continuous) {
   for(int i = 0; i < LAYER_COUNT; i++) {
     if(check_buttons()) return;
     if(!glitch_mode_on) set_layer_solid(i, false, false);
-    else glitch_layer_solid(i, false, false);
+    else {
+      if(i % 2 == 0){
+        glitch_layer_solid(i, false, false);
+        //next_color();
+      } 
+    }
     //set_layer_solid(i, false, false);
     
     if(!continuous && i > 0) {
@@ -252,7 +263,8 @@ void portal(bool rainbow, bool continuous) {
       else glitch_layer_solid(i, true, false);
 
       pixels.show();
-      delay(delayTime * 3);
+      //if(glitch_mode_on) delay(delayTime);
+      /*else*/ delay(delayTime * 3);
     }
   }
 }
@@ -295,7 +307,7 @@ bool spiral_lights(int start_color_idx) {
     if(check_buttons()) return true;
     rightSpiral();
     
-    if(curr_color_array != color_18) delay(delayTime * 5);
+    if(curr_color_array != color_18) delay(delayTime * 4);
     else delay(delayTime * 3);
     pixels.show();
   }
@@ -436,14 +448,15 @@ void glitch_layer_solid(int layer, bool off, bool one_at_a_time) {
   uint32_t color;
 
   if(off) color = 0;
-  else color =  curr_color_array[color_idx];
+  else color =  random(0xFFFFFF);
 
   for(int i = 0; i < glitch_layer_counts[layer]; i++) {
-    pixels.setPixelColor(glitch_layer_offsets[layer] + i, color);  
+    pixels.setPixelColor(glitch_layer_offsets[layer] + i, color); 
     if(one_at_a_time) { 
       pixels.show();
       delay(delayTime / 4);
     }
+    
   }
 }
 
