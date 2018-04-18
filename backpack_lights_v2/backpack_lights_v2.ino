@@ -8,7 +8,7 @@
 #define LIT_MODE 4
 #define GLITCH_MODE_STEPS 10
 #define HISTORY_BUFFER_CNT 3
-#define COLOR_MODE_COUNT 6
+#define COLOR_MODE_COUNT 7
 #define LAYER_COUNT 6
 #define LIGHT_RING_TOTAL 93
 
@@ -34,7 +34,8 @@ uint32_t orange = 0xFF6600;
 
 uint32_t rgb_colors[3] = {red, green, blue};
 uint32_t bw_colors[3] = {blue, white, blue};
-uint32_t red_colors[3] = {red, yellow, orange}; 
+uint32_t red_colors[3] = {red, yellow, orange};
+uint32_t dark_red_colors[3] = {red, 0x800000, 0x696969}; 
 uint32_t rwb_colors[3] = {red, white, blue};
 uint32_t grn_colors[3] = {green, yellow, white};
 uint32_t color_18[18];
@@ -52,7 +53,7 @@ int color_idx = 0;
 uint32_t brightness = 20;
 uint32_t delayTime = 10;
 
-uint8_t spiral_direction = 0;
+bool spiral_direction = true;
 
 bool bool_op1 = false;
 bool bool_op2 = false;
@@ -94,7 +95,8 @@ void setup() {
   color_arrays[2] = red_colors;
   color_arrays[3] = rwb_colors;
   color_arrays[4] = grn_colors;
-  color_arrays[5] = color_18;
+  color_arrays[5] = dark_red_colors;
+  color_arrays[6] = color_18;
 
   //default to RGB mode
   curr_color_array = color_arrays[curr_c_array_idx];
@@ -167,7 +169,15 @@ void lit_mode() {
   } 
   for(int i = 0; i < 4; i++) {
     if(i > 0) glitch_mode_on = false;
+    
     portal(bool_op1, bool_op2);
+
+    if(i == 1) {
+      for(int i = 0; i < LIGHT_RING_TOTAL; i++) {
+        pixels.setPixelColor(i, 0);
+      }
+    }
+    pixels.show();
     delayTime -= 20;
   } 
   delayTime += 20;
@@ -636,7 +646,7 @@ void set_remote_lights(uint8_t switches, uint32_t color) {
 }
 
 void flash_circle(uint32_t c) {
-    for(int i = 0; i < 6; i++) {
+    for(int i = 0; i < LAYER_COUNT; i++) {
       for(int j = 0; j < LIGHT_RING_TOTAL; j++) {
         if(i % 2 == 0) {
           pixels.setPixelColor(j, c);
