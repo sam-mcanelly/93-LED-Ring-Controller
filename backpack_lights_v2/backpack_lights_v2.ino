@@ -162,9 +162,20 @@ void lit_mode() {
 
   if(mode != LIT_MODE) return;
   pulse(bool_op1);
+
+  if(mode != LIT_MODE) return;
+  glitch_mode_on = true;
+  for(int i = 0; i < 15; i++ ) {
+    if(mode != LIT_MODE) return;
+    portal(bool_op1, bool_op2);
+  }
+  glitch_mode_on = false;
   
   if(mode != LIT_MODE) return;
-  for(int i = 0; i < 30; i++) random_blink(10);
+  for(int i = 0; i < 30; i++) {
+    if(mode != LIT_MODE) return;
+    random_blink(10);
+  }
 
   if(mode != LIT_MODE) return;
   spiral(true, true);
@@ -176,24 +187,47 @@ void lit_mode() {
   pulse(!bool_op1);
 
   if(mode != LIT_MODE) return;
-  for(int i = 0; i < 30; i++) random_blink(10);
-  
+  for(int i = 0; i < 30; i++){
+    if(mode != LIT_MODE) return;
+    random_blink(10);
+  } 
+
+  if(mode != LIT_MODE) return;
+  portal(bool_op1, bool_op2);
+
+  if(mode != LIT_MODE) return;
+  portal(bool_op1, !bool_op2);
+
+  if(mode != LIT_MODE) return;
+  pulse(bool_op1);
+
+  if(mode != LIT_MODE) return;
+  portal(bool_op1, !bool_op2);
+
+  if(mode != LIT_MODE) return;
+  portal(bool_op1, bool_op2);
+
   if(mode != LIT_MODE) return;
   for(int i = 0; i < 3; i++) {
+    if(mode != LIT_MODE) return;
     if(i == 2) glitch_mode_on = true;
     portal(bool_op1, bool_op2);
     delayTime += 20;
   } 
   for(int i = 0; i < 4; i++) {
+    if(mode != LIT_MODE) return;
     if(i > 0) glitch_mode_on = false;
     if(i == 1) {
       for(int i = 0; i < LIGHT_RING_TOTAL; i++) {
         pixels.setPixelColor(i, 0);
       }
+      pixels.show();
     }
+
+    if(mode != LIT_MODE) return;
     portal(!bool_op1, bool_op2);
    
-    pixels.show();
+    
     delayTime -= 20;
   } 
   delayTime += 20;
@@ -231,7 +265,8 @@ void pulse(bool rainbow) {
   for(int i = 0; i < LAYER_COUNT; i++) {
     if(check_buttons()) return;
     
-    set_layer_solid(i, false, false);
+    if(glitch_mode_on) glitch_layer_solid(i, false, false);
+    else set_layer_solid(i, false, false);
 
     if(rainbow) {
       next_color();
@@ -571,7 +606,12 @@ void check_speed_button() {
         update_remote();
         return;
       } else if(long_hold && fast_mode_switching) {
-        if(mode != LIT_MODE) glitch_mode_on = !glitch_mode_on;
+        if(mode != LIT_MODE){
+          flash_remote(white);
+          update_remote();
+          glitch_mode_on = !glitch_mode_on;
+          return;
+        }
       }
     }
 
