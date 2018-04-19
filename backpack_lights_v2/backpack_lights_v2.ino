@@ -49,8 +49,18 @@ int curr_c_array_size;
 int curr_c_array_idx = 0;
 int color_idx = 0;
 
+unsigned long last_btn1_press = 0;
+unsigned long last_btn2_press = 0;
+unsigned long last_btn3_press = 0;
+unsigned long curr_time;
 
-uint32_t brightness = 20;
+bool btn1_pushed = false;
+bool btn2_pushed = false;
+bool btn3_pushed = false;
+bool fast_mode_switching = false;
+bool spam_switch_modes = false;
+
+uint32_t brightness = 10;
 uint32_t delayTime = 10;
 
 bool spiral_direction = true;
@@ -145,12 +155,19 @@ void lit_mode() {
   pulse(!bool_op1);
   
   if(mode != LIT_MODE) return;
-  for(int i = 0; i < 2; i++) portal(!bool_op1, !bool_op2);
+  portal(!bool_op1, !bool_op2);
 
+  if(mode != LIT_MODE) return;
+  pulse(!bool_op1);
+
+  if(mode != LIT_MODE) return;
   pulse(bool_op1);
   
   if(mode != LIT_MODE) return;
   for(int i = 0; i < 30; i++) random_blink(10);
+
+  if(mode != LIT_MODE) return;
+  spiral(true, true);
   
   if(mode != LIT_MODE) return;
   pulse(bool_op1);
@@ -169,14 +186,13 @@ void lit_mode() {
   } 
   for(int i = 0; i < 4; i++) {
     if(i > 0) glitch_mode_on = false;
-    
-    portal(bool_op1, bool_op2);
-
     if(i == 1) {
       for(int i = 0; i < LIGHT_RING_TOTAL; i++) {
         pixels.setPixelColor(i, 0);
       }
     }
+    portal(!bool_op1, bool_op2);
+   
     pixels.show();
     delayTime -= 20;
   } 
@@ -502,6 +518,8 @@ void seton_half_layer(int layer, int start_pt) {
  * -------------------------------
  */
 bool check_buttons() {
+  curr_time = millis();
+
   check_speed_button();
   check_function_button();
   return check_mode_button();
@@ -509,8 +527,9 @@ bool check_buttons() {
 
 bool check_mode_button() {
   if(digitalRead(BTN1_PIN) == LOW){
-    delay(400);
+    if(curr_time - last_btn1_press < 100) return;
 
+    last_btn1_press = curr_time;
     //changing op1 logic (rainbow mode)
     //initiated by pressing first two buttons
     if(check_op1_logic()) return false;
@@ -521,10 +540,16 @@ bool check_mode_button() {
 
     //check for long hold
     if(check_long_hold(BTN1_PIN)) {
-      flash_circle(blue);
-      mode = 4;
+      uint32_t c = (fast_mode_switching) ? red : green;
+      flash_circle(c);
+      flash_remote(c);
+      fast_mode_switching = !fast_mode_switching;
+      update_remote();
+      last_btn1_press = millis();
+      
       return true;
     }
+
     next_mode();
     return true;
   }
@@ -533,28 +558,54 @@ bool check_mode_button() {
 
 void check_speed_button() {
   if(digitalRead(BTN2_PIN) == LOW){
-    delay(200);
+    if(curr_time - last_btn2_press < 100) return;
 
     if(digitalRead(BTN3_PIN) == LOW) {
       increment_brightness();
+      last_btn2_press = curr_time;
+    } else {
+      bool long_hold = check_long_hold(BTN2_PIN);
+      if(long_hold && !fast_mode_switching) {
+        delayTime = 18;
+        flash_remote(blue);
+        update_remote();
+        return;
+      } else if(long_hold && fast_mode_switching) {
+        if(mode != LIT_MODE) glitch_mode_on = !glitch_mode_on;
+      }
     }
 
-    increment_delay_time();
+    if(fast_mode_switching) { 
+      prev_mode();
+      last_btn2_press = curr_time;
+      return;
+    } else {
+      increment_delay_time();
+    }
+    last_btn2_press = curr_time;
   }
 }
 
 void check_function_button() {
   if(digitalRead(BTN3_PIN) == LOW) {
-    delay(50);
+    if(curr_time - last_btn3_press < 100) return;
     //execute_glitch();
-    glitch_mode_on = !glitch_mode_on;
+    if(check_long_hold(BTN3_PIN)) {
+      next_color_mode();
+      last_btn3_press = curr_time;
+      return;
+    }
+    if(mode != LIT_MODE && !fast_mode_switching) bool_op1 = !bool_op1;
+    else if(mode != LIT_MODE && fast_mode_switching) increment_brightness();
+    last_btn3_press = curr_time;
   }
 }
 
 void increment_brightness() {
-    if(brightness < 20) brightness += 2;
-    else brightness += 10;
-    brightness %= 240;
+    if(brightness < 10) brightness += 1;
+    else if(brightness < 100) brightness += 25;
+    else brightness += 50;
+    if(brightness > 240) brightness = 0;
     pixels.setBrightness(brightness);
     remote_pixels.setBrightness(brightness);
 }
@@ -572,15 +623,19 @@ bool check_long_hold(int button_pin) {
 bool check_color_array_logic() {
   if(digitalRead(BTN3_PIN) == LOW) {
     delay(100);
-    flash_circle(red);
-    curr_c_array_idx += 1;
-    curr_c_array_idx %= COLOR_MODE_COUNT;
-    curr_color_array = color_arrays[curr_c_array_idx];
-    if(curr_color_array != color_18) curr_c_array_size = rgb_arr_sz;
-    else curr_c_array_size = color_18_sz;
+    next_color_mode();
     return true;
   }
   return false;
+}
+
+void next_color_mode() {
+  flash_circle(red);
+  curr_c_array_idx += 1;
+  curr_c_array_idx %= COLOR_MODE_COUNT;
+  curr_color_array = color_arrays[curr_c_array_idx];
+  if(curr_color_array != color_18) curr_c_array_size = rgb_arr_sz;
+  else curr_c_array_size = color_18_sz;
 }
 
 //check if button 1 and button 2 are pressed
@@ -602,6 +657,13 @@ void next_mode() {
   update_remote();
 }
 
+void prev_mode() {
+  if(mode == 0) mode = 4;
+  else mode--;
+  
+  update_remote();
+}
+
 void next_color() {
   color_idx += 1;
   color_idx %= curr_c_array_size;
@@ -609,7 +671,11 @@ void next_color() {
 
 void increment_delay_time() {
   delayTime++;
-  delayTime = (delayTime % 50) + 2;
+  if(delayTime < 10) delayTime +=  1;
+  else if(delayTime >=10 && delayTime < 25) delayTime += 5;
+  else delayTime += 15;
+
+  if(delayTime > 100) delayTime = 0;
 }
 
 void save_frame(uint32_t states[][LIGHT_RING_TOTAL], int idx) {
@@ -628,8 +694,8 @@ void update_remote() {
   uint32_t color;
   uint8_t switches;
   
-  if(mode == 0) color = 0;
-  else color = (8 % mode == 8) ? green : red;
+  if(fast_mode_switching) color = green;
+  else color = red;;
 
   switches = mode;
   if(switches > 7) switches -= 7;
@@ -657,6 +723,17 @@ void flash_circle(uint32_t c) {
       pixels.show();
       delay(150);
     }
+}
+
+void flash_remote(uint32_t c) {
+  for(int j = 0; j < 6; j++) {
+    for(int i = 0; i < 3; i++) {
+      if(j % 2 == 0) remote_pixels.setPixelColor(i, c);
+      else remote_pixels.setPixelColor(i, 0);
+    }
+    remote_pixels.show();
+    delay(150);
+  }
 }
 
 void compute_color_18() {

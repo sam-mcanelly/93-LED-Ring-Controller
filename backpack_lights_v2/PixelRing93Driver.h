@@ -16,7 +16,7 @@
 #define LIGHT_RING_TOTAL 93
 
 #include "Arduino.h"
-#include <AdafruitNeoPixel.h>
+#include <Adafruit_NeoPixel.h>
 
 //colors
 const uint32_t red = 0xFF0000;
